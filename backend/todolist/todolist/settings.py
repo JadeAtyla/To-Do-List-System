@@ -44,7 +44,7 @@ INSTALLED_APPS = [
 
 REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 5  # Default page size for all views
+    'PAGE_SIZE': 5 # set the number of data to view every pagination
 }
 
 MIDDLEWARE = [
