@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>To-Do List</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        #active-tasks-list,
+        #completed-tasks-list,
+        #deleted-tasks-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+
+<body class="bg-light d-flex justify-content-center align-items-center vh-100">
+    <div class="container-sm bg-white p-5 rounded shadow-lg">
+        <h2 class="text-center mb-4">To-Do List</h2>
+
+        <!-- New Task Input -->
+        <div class="mb-4">
+            <input type="text" id="new-task-title" class="form-control mb-2" placeholder="Task title">
+            <textarea id="new-task-desc" class="form-control mb-3" placeholder="Task description"></textarea>
+            <button id="add-task" class="btn btn-primary w-100">Add Task</button>
+        </div>
+
+        <!-- Navigation Bar -->
+        <nav>
+            <ul class="nav nav-pills mb-4" id="task-nav">
+                <li class="nav-item">
+                    <button class="nav-link active" id="nav-active-tasks">Active Tasks</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="nav-completed-tasks">Completed Tasks</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="nav-deleted-tasks">Deleted Tasks</button>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Task Sections -->
+        <div id="task-sections">
+            <!-- Active Tasks -->
+            <div id="active-tasks-section">
+                <h3 class="text-center mb-3">Active Tasks</h3>
+                <div id="active-tasks-list" class="list-group"></div>
+                <div id="active-pagination-controls" class="d-flex justify-content-center mt-3"></div>
+            </div>
+
+            <!-- Completed Tasks -->
+            <div id="completed-tasks-section" hidden>
+                <h3 class="text-center mb-3">Completed Tasks</h3>
+                <div id="completed-tasks-list" class="list-group"></div>
+                <div id="completed-pagination-controls" class="d-flex justify-content-center mt-3"></div>
+            </div>
+
+            <!-- Deleted Tasks -->
+            <div id="deleted-tasks-section" hidden>
+                <h3 class="text-center mb-3">Deleted Tasks</h3>
+                <div id="deleted-tasks-list" class="list-group"></div>
+                <div id="deleted-pagination-controls" class="d-flex justify-content-center mt-3"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://127.0.0.1:8000/api/todos/';
+        const TASKS_PER_PAGE = 5;
+
+        let activePage = 1;
+        let completedPage = 1;
+        let deletedPage = 1;
+
+        async function fetchTasks(state, page) {
+            try {
+                const response = await axios.get(`${API_URL}?state=${state}&page=${page}`);
+                const tasks = response.data.results;
+                const totalTasks = response.data.count;
+                const totalPages = Math.ceil(totalTasks / TASKS_PER_PAGE);
+
+                const listId = `${state}-tasks-list`;
+                const paginationId = `${state}-pagination-controls`;
+
+                const taskList = document.getElementById(listId);
+                const paginationControls = document.getElementById(paginationId);
+
+                taskList.innerHTML = '';
+                paginationControls.innerHTML = '';
+
+                tasks.forEach(task => {
+                    const listItem = document.createElement('div');
+                    listItem.className = `list-group-item d-flex justify-content-between align-items-center ${task.deleted ? 'bg-danger text-white' : ''}`;
+
+                    listItem.innerHTML = `
+                        <div>
+                            <h5 class="mb-1">${task.title}</h5>
+                            <small>${task.description}</small>
+                            <div class="text-muted">
+                                <small>Created: ${new Date(task.created_at).toLocaleString()}</small><br>
+                                <small>Updated: ${new Date(task.updated_at).toLocaleString()}</small>
+                            </div>
+                        </div>
+                        <div>
+                            ${state === 'deleted'
+                                ? `<button class="btn btn-warning btn-sm restore-btn" data-id="${task.id}">Restore</button>`
+                                : `${state === 'active'
+                                    ? `<button class="btn btn-success btn-sm complete-btn" data-id="${task.id}">✔</button>
+                                       <button class="btn btn-secondary btn-sm edit-btn" data-id="${task.id}">Edit</button>`
+                                    : `<button class="btn btn-secondary btn-sm uncheck-btn" data-id="${task.id}">Uncheck</button>`
+                                }
+                                <button class="btn btn-danger btn-sm delete-btn" data-id="${task.id}">✖</button>`
+                            }
+                        </div>
+                    `;
+
+                    taskList.appendChild(listItem);
+
+                    // Handle restoring task in deleted section
+                    if (state === 'deleted') {
+                        listItem.querySelector('.restore-btn')?.addEventListener('click', async () => {
+                            try {
+                                const taskId = task.id;
+                                console.log(`Restoring task with ID: ${taskId}`);
+                                await axios.patch(`${API_URL}${taskId}/`, { deleted: false });
+                                fetchTasks('deleted', deletedPage);  // Refresh deleted section
+                            } catch (error) {
+                                console.error('Error restoring task:', error);
+                            }
+                        });
+                    }
+
+                    // Handle deleting task (move to deleted section)
+                    listItem.querySelector('.delete-btn')?.addEventListener('click', async () => {
+                        try {
+                            const taskId = task.id;
+                            console.log(`Deleting task with ID: ${taskId}`);
+                            await axios.patch(`${API_URL}${taskId}/`, { deleted: true });
+                            fetchTasks(state, page);  // Refresh list
+                        } catch (error) {
+                            console.error('Error deleting task:', error);
+                        }
+                    });
+
+                    // Handle completing task (active tasks)
+                    if (state === 'active') {
+                        listItem.querySelector('.complete-btn')?.addEventListener('click', async () => {
+                            try {
+                                const taskId = task.id;
+                                console.log(`Completing task with ID: ${taskId}`);
+                                await axios.patch(`${API_URL}${taskId}/`, { completed: true });
+                                fetchTasks('active', activePage);  // Refresh active tasks
+                            } catch (error) {
+                                console.error('Error completing task:', error);
+                            }
+                        });
+
+                        // Handle editing task (active tasks)
+                        listItem.querySelector('.edit-btn')?.addEventListener('click', async () => {
+                            const newTitle = prompt("Enter new title:", task.title);
+                            const newDescription = prompt("Enter new description:", task.description);
+                            if (newTitle !== null && newDescription !== null) {
+                                try {
+                                    const taskId = task.id;
+                                    console.log(`Editing task with ID: ${taskId}`);
+                                    await axios.patch(`${API_URL}${taskId}/`, { title: newTitle, description: newDescription });
+                                    fetchTasks('active', activePage);  // Refresh active tasks
+                                } catch (error) {
+                                    console.error('Error editing task:', error);
+                                }
+                            }
+                        });
+                    }
+
+                    // Handle unchecking task (completed tasks)
+                    if (state === 'completed') {
+                        listItem.querySelector('.uncheck-btn')?.addEventListener('click', async () => {
+                            try {
+                                const taskId = task.id;
+                                console.log(`Unchecking task with ID: ${taskId}`);
+                                await axios.patch(`${API_URL}${taskId}/`, { completed: false });
+                                fetchTasks('completed', completedPage);  // Refresh completed tasks
+                            } catch (error) {
+                                console.error('Error unchecking task:', error);
+                            }
+                        });
+                    }
+                });
+
+                // Pagination controls
+                for (let i = 1; i <= totalPages; i++) {
+                    const button = document.createElement('button');
+                    button.className = 'btn btn-outline-primary mx-1';
+                    button.textContent = i;
+                    button.disabled = i === page;
+                    button.addEventListener('click', () => {
+                        if (state === 'active') activePage = i;
+                        if (state === 'completed') completedPage = i;
+                        if (state === 'deleted') deletedPage = i;
+                        fetchTasks(state, i);
+                    });
+                    paginationControls.appendChild(button);
+                }
+            } catch (error) {
+                console.error('Error fetching tasks:', error);
+            }
+        }
+
+        function showSection(section) {
+            document.getElementById('active-tasks-section').hidden = section !== 'active';
+            document.getElementById('completed-tasks-section').hidden = section !== 'completed';
+            document.getElementById('deleted-tasks-section').hidden = section !== 'deleted';
+
+            document.querySelectorAll('#task-nav .nav-link').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`nav-${section}-tasks`).classList.add('active');
+
+            fetchTasks(section, section === 'active' ? activePage : section === 'completed' ? completedPage : deletedPage);
+        }
+
+        document.getElementById('add-task').addEventListener('click', async () => {
+            const title = document.getElementById('new-task-title').value;
+            const description = document.getElementById('new-task-desc').value;
+
+            await axios.post(API_URL, { title, description });
+            fetchTasks('active', activePage);
+        });
+
+        document.getElementById('nav-active-tasks').addEventListener('click', () => showSection('active'));
+        document.getElementById('nav-completed-tasks').addEventListener('click', () => showSection('completed'));
+        document.getElementById('nav-deleted-tasks').addEventListener('click', () => showSection('deleted'));
+
+        fetchTasks('active', activePage); // Initial load
+    </script>
+</body>
+
+</html>
