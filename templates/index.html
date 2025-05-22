@@ -69,7 +69,7 @@
     </div>
 
     <script>
-        const API_URL = 'http://127.0.0.1:8000/api/todos/';
+        const API_URL = '/api/todos/';
         const TASKS_PER_PAGE = 5;
 
         let activePage = 1;
@@ -125,9 +125,9 @@
                         listItem.querySelector('.restore-btn')?.addEventListener('click', async () => {
                             try {
                                 const taskId = task.id;
-                                console.log(`Restoring task with ID: ${taskId}`);
                                 await axios.patch(`${API_URL}${taskId}/`, { deleted: false });
-                                fetchTasks('deleted', deletedPage);  // Refresh deleted section
+                                fetchTasks('deleted', deletedPage);
+                                fetchTasks('active', activePage);
                             } catch (error) {
                                 console.error('Error restoring task:', error);
                             }
@@ -138,9 +138,9 @@
                     listItem.querySelector('.delete-btn')?.addEventListener('click', async () => {
                         try {
                             const taskId = task.id;
-                            console.log(`Deleting task with ID: ${taskId}`);
                             await axios.patch(`${API_URL}${taskId}/`, { deleted: true });
-                            fetchTasks(state, page);  // Refresh list
+                            fetchTasks(state, page);
+                            fetchTasks('deleted', deletedPage);
                         } catch (error) {
                             console.error('Error deleting task:', error);
                         }
@@ -151,9 +151,9 @@
                         listItem.querySelector('.complete-btn')?.addEventListener('click', async () => {
                             try {
                                 const taskId = task.id;
-                                console.log(`Completing task with ID: ${taskId}`);
                                 await axios.patch(`${API_URL}${taskId}/`, { completed: true });
-                                fetchTasks('active', activePage);  // Refresh active tasks
+                                fetchTasks('active', activePage);
+                                fetchTasks('completed', completedPage);
                             } catch (error) {
                                 console.error('Error completing task:', error);
                             }
@@ -166,9 +166,8 @@
                             if (newTitle !== null && newDescription !== null) {
                                 try {
                                     const taskId = task.id;
-                                    console.log(`Editing task with ID: ${taskId}`);
                                     await axios.patch(`${API_URL}${taskId}/`, { title: newTitle, description: newDescription });
-                                    fetchTasks('active', activePage);  // Refresh active tasks
+                                    fetchTasks('active', activePage);
                                 } catch (error) {
                                     console.error('Error editing task:', error);
                                 }
@@ -181,9 +180,9 @@
                         listItem.querySelector('.uncheck-btn')?.addEventListener('click', async () => {
                             try {
                                 const taskId = task.id;
-                                console.log(`Unchecking task with ID: ${taskId}`);
                                 await axios.patch(`${API_URL}${taskId}/`, { completed: false });
-                                fetchTasks('completed', completedPage);  // Refresh completed tasks
+                                fetchTasks('completed', completedPage);
+                                fetchTasks('active', activePage);
                             } catch (error) {
                                 console.error('Error unchecking task:', error);
                             }
@@ -225,8 +224,19 @@
             const title = document.getElementById('new-task-title').value;
             const description = document.getElementById('new-task-desc').value;
 
-            await axios.post(API_URL, { title, description });
-            fetchTasks('active', activePage);
+            if (!title.trim()) {
+                alert("Task title is required.");
+                return;
+            }
+
+            try {
+                await axios.post(API_URL, { title, description });
+                document.getElementById('new-task-title').value = '';
+                document.getElementById('new-task-desc').value = '';
+                fetchTasks('active', activePage);
+            } catch (error) {
+                alert(error.response?.data?.error || "Failed to add task.");
+            }
         });
 
         document.getElementById('nav-active-tasks').addEventListener('click', () => showSection('active'));
