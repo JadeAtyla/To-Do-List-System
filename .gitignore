@@ -1,0 +1,8 @@
+instance
+*.db
+*.sqlite
+*.sqlite3
+*.log
+*.pyc
+__pycache__/
+*.egg-info/
