@@ -7,9 +7,9 @@ import os
 app = Flask(__name__)
 CORS(app)
 
-# Ensure instance folder exists for the database
-os.makedirs(os.path.join(app.root_path, 'instance'), exist_ok=True)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(app.root_path, 'instance', 'todo.db')
+# Use a writable location for SQLite on Vercel
+db_path = os.environ.get("DATABASE_URL") or "sqlite:////tmp/todo.db"
+app.config['SQLALCHEMY_DATABASE_URI'] = db_path
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -120,5 +120,5 @@ def delete_todo(todo_id):
 with app.app_context():
     db.create_all()
 
-# if __name__ == '__main__':
-app.run(debug=True)
+if __name__ == '__main__':
+    app.run(debug=True)
