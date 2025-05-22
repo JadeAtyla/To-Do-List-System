@@ -2,11 +2,14 @@ from flask import Flask, render_template, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from datetime import datetime
+import os
 
 app = Flask(__name__)
 CORS(app)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///todo.db'
+# Ensure instance folder exists for the database
+os.makedirs(os.path.join(app.root_path, 'instance'), exist_ok=True)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(app.root_path, 'instance', 'todo.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -33,7 +36,9 @@ class Todo(db.Model):
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    # Get first page of active tasks for initial render
+    active_tasks = Todo.query.filter_by(completed=False, deleted=False).order_by(Todo.created_at.desc()).limit(5).all()
+    return render_template('index.html', initial_tasks=[t.to_dict() for t in active_tasks])
 
 @app.route('/api/todos/', methods=['GET', 'POST'])
 def todos():
